@@ -118,7 +118,7 @@ typedef struct _SnowglobeScreen
     float radius;       /* radius on which the hSize points lie */
     float arcAngle;   	/* 360 degrees / horizontal size */
 
-    float speedFactor;  /* multiply fish/crab speeds by this value */
+    float speedFactor;  /* multiply snowflake speeds by this value */
 
     float oldProgress;
     
