@@ -258,7 +258,7 @@ snowglobePaintInside (CompScreen *s,
     int i;
 	
     float floatErr = 0.0001;
-    Bool cylinder = atlantisIsCylinder(s);
+    Bool cylinder = snowglobeIsCylinder(s);
 	
     as->waterHeight = snowglobeGetWaterHeight(s)*100000-50000;
 
