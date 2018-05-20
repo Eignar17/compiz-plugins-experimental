@@ -310,7 +310,7 @@ snowglobePaintInside (CompScreen *s,
 	    if (snowglobeGetShowWater (s))
 		deformCylinder(s, as->water, progress);
 
-	    if (atlantisGetShowGround (s))
+	    if (snowglobeGetShowGround (s))
 	    {
 		deformCylinder(s, as->ground, progress);
 		updateHeight (as->ground, FALSE);
