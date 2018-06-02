@@ -3,6 +3,7 @@ icons_DATA =				\
 	plugin-earth.svg		\
 	plugin-throw.svg		\
 	plugin-animationplus.svg	\
+	plugin-anaglyph.svg	        \
 	plugin-animationsim.svg
 
 install-data-hook:
