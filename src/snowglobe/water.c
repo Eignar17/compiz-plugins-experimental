@@ -1104,6 +1104,64 @@ drawGround (Water *w, Water *g)
 
 }
 
+static void fillBottom (Water *w,
+                        float distance,
+                        float bottom,
+                        int currentDeformation)
+{
+    int   i;
+    float *v;
+    int	  size = w->size;
+
+    glDisableClientState (GL_TEXTURE_COORD_ARRAY);
+
+    if (currentDeformation == DeformationCylinder)
+    {
+	v = (float *) w->vertices;
+
+	glNormal3f (0, -1, 0);
+
+	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+	glDisableClientState (GL_NORMAL_ARRAY);
+
+	glDrawElements (GL_TRIANGLE_FAN, w->nBIdx,
+	                GL_UNSIGNED_INT, w->indices + w->nSIdx + w->nWIdx);
+    }
+    else if (currentDeformation == DeformationSphere &&
+	     w->vertices2 && w->indices2)
+    {
+	v = (float *) w->vertices2;
+
+	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+
+	glDisableClientState (GL_NORMAL_ARRAY);
+
+	glNormal3f (0, -1, 0);
+
+	glDrawElements (GL_TRIANGLE_FAN, w->nBIdx2,
+	                GL_UNSIGNED_INT, w->indices2 + w->nWIdx2);
+    }
+    else
+    {
+	float r = distance / cosf (M_PI / size);
+	float ang = M_PI / size;
+	float aStep = 2 * M_PI / size;
+
+	glBegin (GL_TRIANGLE_FAN);
+	glNormal3f (0, -1, 0);
+	glVertex3f (0.0, bottom, 0.0);
+
+	for (i = 0; i <= size; i++)
+	{
+	    glVertex3f (sinf (ang) * r, bottom, cosf (ang) * r);
+	    ang -= aStep;
+	}
+	glEnd ();
+    }
+
+    glEnableClientState (GL_TEXTURE_COORD_ARRAY);
+}
+
 void
 drawBottomGround (Water *w,
                   float distance,
