@@ -1105,25 +1105,34 @@ drawGround (Water *w, Water *g)
 }
 
 void
-drawBottomGround (int size, float distance, float bottom)
+drawBottomGround (Water *w,
+                  float distance,
+                  float bottom,
+                  int currentDeformation)
 {
-	glEnable (GL_COLOR_MATERIAL);
+    glDisable (GL_DEPTH_TEST);
 
-    int   i;
-    float r = distance / cos (M_PI / size);
-    float ang = M_PI / size;
-    float aStep = 2 * M_PI / size;
+    glEnable  (GL_LIGHTING);
+    glEnable  (GL_LIGHT1);
+    glDisable (GL_LIGHT0);
 
-    for (i = 0; i < size; i++)
-    {
-	glBegin (GL_TRIANGLES);
+    fillBottom (w, distance, bottom, currentDeformation);
 
-	glVertex3f (sin (ang - aStep) * r, bottom, cos (ang - aStep) * r);
-	glVertex3f (0.0, bottom, 0.0);
-	glVertex3f (sin (ang) * r, bottom, cos (ang) * r);
-	glEnd ();
-	ang += aStep;
-    }
+    glDisable (GL_LIGHTING);
+}
+
+void
+drawBottomWater (Water *w,
+                 float distance,
+                 float bottom,
+                 int currentDeformation)
+{
+    glDisable (GL_DEPTH_TEST);
+
+    glDisable (GL_LIGHTING);
+
+    glEnable (GL_COLOR_MATERIAL);
+    fillBottom (w, distance, bottom, currentDeformation);
 }
 
 float
