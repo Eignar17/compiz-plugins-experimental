@@ -583,7 +583,7 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 }
 
 void
-drawWater (Water *w, Bool full, Bool wire)
+drawWater (Water *w, Bool full, Bool wire, int currentDeformation)
 {
     static const float mat_shininess[]      = { 50.0 };
     static const float mat_specular[]       = { 0.5, 0.5, 0.5, 1.0 };
@@ -1037,7 +1037,7 @@ updateDeformation (CompScreen *s,
 }
 
 void
-drawGround (Water *w, Water *g)
+drawGround (Water *w, Water *g, int currentDeformation)
 {
     static const float mat_shininess[]      = { 40.0 };
     static const float mat_specular[]       = { 0.0, 0.0, 0.0, 1.0 };
