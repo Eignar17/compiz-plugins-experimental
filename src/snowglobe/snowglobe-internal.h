@@ -135,8 +135,12 @@ updateGround (CompScreen *s, float time);
 void
 updateHeight (Water *w);
 
-void
-deformCylinder(CompScreen *s, Water  *w, float);
+/* utility methods */
+int
+getCurrentDeformation(CompScreen *s);
+
+int
+getDeformationMode(CompScreen *s);
 
 void
 freeWater (Water *w);
