@@ -25,11 +25,6 @@
 extern int snowglobeDisplayPrivateIndex;
 extern int cubeDisplayPrivateIndex;
 
-/* matching values from cubeaddon plugin */
-#define DeformationNone = 0
-#define DeformationCylinder = 1
-#define DeformationSphere = 2
-
 #define GET_SNOWGLOBE_DISPLAY(d) \
     ((SnowglobeDisplay *) (d)->base.privates[snowglobeDisplayPrivateIndex].ptr)
 #define SNOWGLOBE_DISPLAY(d) \
@@ -40,6 +35,11 @@ extern int cubeDisplayPrivateIndex;
 #define SNOWGLOBE_SCREEN(s) \
     SnowglobeScreen *as = GET_SNOWGLOBE_SCREEN(s, GET_SNOWGLOBE_DISPLAY(s->display))
 
+
+/* matching values from cubeaddon plugin */
+#define DeformationNone = 0
+#define DeformationCylinder = 1
+#define DeformationSphere = 2
 
 typedef struct _snowflakeRec
 {
