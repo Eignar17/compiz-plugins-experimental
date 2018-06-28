@@ -74,7 +74,6 @@
 #include "snowglobe-internal.h"
 #include "snowglobe_options.h"
 
-static Bool snowglobeIsCylinder(CompScreen *);
 
 int snowglobeDisplayPrivateIndex;
 
@@ -192,59 +191,6 @@ snowglobeClearTargetOutput (CompScreen *s,
     glClear (GL_DEPTH_BUFFER_BIT);
 }
 
-static Bool
-snowglobeIsCylinder(CompScreen *s)
-{
-    CUBE_SCREEN (s);
-    
-    static const int CYLINDER = 1;
-   
-    CompPlugin *p = NULL;
-    const char plugin[] = "cubeaddon";
-    p = findActivePlugin (plugin);
-    if (p && p->vTable->getObjectOptions)
-    {
-	CompOption *option;
-	int  nOption;
-	Bool cylinderManualOnly = FALSE;
-	Bool unfoldDeformation = TRUE;
-	
-	option = (*p->vTable->getObjectOptions) (p, (CompObject *)s,
-		&nOption);
-	option = compFindOption (option, nOption, "deformation", 0);
-
-	if (option)
-	    if (option->value.b)
-		cylinderManualOnly = option->value.b;
-
-	option = (*p->vTable->getObjectOptions) (p, (CompObject *)s,
-		&nOption);
-	option = compFindOption (option, nOption, "cylinder_manual_only", 0);
-	
-	if (option)
-	    if (option->value.b)
-		unfoldDeformation = option->value.b;
-	
-	if (s->hsize * cs->nOutput > 2 && s->desktopWindowCount &&
-	    (cs->rotationState == RotationManual ||
-	    (cs->rotationState == RotationChange &&
-	    !cylinderManualOnly)) &&
-	    (!cs->unfolded || unfoldDeformation))
-	{
-	    option = (*p->vTable->getObjectOptions) (p, (CompObject *)s,
-		      &nOption);
-	    option = compFindOption (option, nOption, "deformation", 0);
-
-	    if (option)
-		return (option->value.i==CYLINDER);
-	}
-    }
-    return FALSE;
-}
-
-
-
-
 static void
 snowglobePaintInside (CompScreen *s,
 		const ScreenPaintAttrib *sAttrib,
@@ -257,8 +203,7 @@ snowglobePaintInside (CompScreen *s,
 
     int i;
 	
-    float floatErr = 0.0001;
-    Bool cylinder = snowglobeIsCylinder(s);
+    int currentDeformation = getCurrentDeformation(s);
 	
     as->waterHeight = snowglobeGetWaterHeight(s)*100000-50000;
 
@@ -275,48 +220,12 @@ snowglobePaintInside (CompScreen *s,
     ScreenPaintAttrib sA = *sAttrib;
     CompTransform mT = *transform;
 
-    float progress, dummy;
-    (*cs->getRotation) (s, &dummy, &dummy, &progress);
-
     if (snowglobeGetShowWater(s))
 	updateHeight(as->water);
     {
-	Bool deform = FALSE;
-	
-	if (cylinder)
-	{
-	    if (fabsf(1.0f - progress) < floatErr)
-		progress = 1.0f;
-	    
-	    if (as->oldProgress != 1.0f || progress != 1.0f)
-	    {
-		deform = TRUE;
-		as->oldProgress = progress;
-	    }
-	}
-	else if (as->oldProgress != 0.0f)
-	{
-	    if (fabsf(progress) < floatErr ||
-		progress >= as->oldProgress + floatErr)
-		progress = 0.0f;
-
-	    deform = TRUE;
-
-	    as->oldProgress = progress;
-	}	
-	    
-	if (deform)
-	{
-	    if (snowglobeGetShowWater (s))
-		deformCylinder(s, as->water, progress);
-
-	    if (snowglobeGetShowGround (s))
-	    {
-		deformCylinder(s, as->ground, progress);
-		updateHeight (as->ground, FALSE);
-	    }
-	}
-	
+	updateDeformation (s, currentDeformation);
+ 	updateHeight (as->water, atlantisGetWaveRipple(s));
+     }	
     sA.yRotate += cs->invert * (360.0f / size) *
 		 (cs->xRotations - (s->x* cs->nOutput));
 
@@ -423,6 +332,8 @@ snowglobePaintInside (CompScreen *s,
 	drawWater(as->water, snowglobeGetShowWater(s), 0);
     }
 
+    if (currentDeformation!=DeformationCylinder)
+    {
     if (snowglobeGetShowGround(s))
     {
 	glColor4f(0.8, 0.8, 0.8, 1.0);
@@ -459,13 +370,13 @@ snowglobePreparePaintScreen (CompScreen *s,
 
     int i;
 
-    Bool cylinder = snowglobeIsCylinder(s);
+    Bool currentDeformation = getCurrentDeformation(s);
     int oldhsize = as->hsize;
     
     updateWater (s, (float)ms / 1000.0);
     updateGround (s, (float)ms / 1000.0);
 	
-    if (cylinder && as->oldProgress>0.9)
+    if (currentDeformation==DeformationCylinder && as->oldProgress>0.9)
     {
 	as->hsize*=32/as->hsize;
 	as->arcAngle = 360.0f / as->hsize;
