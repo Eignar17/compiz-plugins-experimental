@@ -26,9 +26,9 @@ extern int snowglobeDisplayPrivateIndex;
 extern int cubeDisplayPrivateIndex;
 
 /* matching values from cubeaddon plugin */
-#define DeformationNone = 0
-#define DeformationCylinder = 1
-#define DeformationSphere = 2
+#define DeformationNone		0
+#define DeformationCylinder	1
+#define DeformationSphere	2
 
 #define GET_SNOWGLOBE_DISPLAY(d) \
     ((SnowglobeDisplay *) (d)->base.privates[snowglobeDisplayPrivateIndex].ptr)
@@ -136,7 +136,7 @@ void
 updateHeight (Water *w);
 
 void
-deformCylinder(CompScreen *s, Water  *w, float);
+updateDeformation (CompScreen *s, int currentDeformation);
 
 void
 freeWater (Water *w);
@@ -149,6 +149,13 @@ drawGround (Water *w, Water *g);
 
 void
 drawBottomGround (int size, float distance, float bottom);
+
+ /* utility methods */
+int
+getCurrentDeformation(CompScreen *s);
+
+int
+getDeformationMode(CompScreen *s);
 
 Bool
 isInside (CompScreen *s, float x, float y, float z);
