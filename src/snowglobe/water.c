@@ -306,113 +306,7 @@ setAmplitude (Vertex *v,
 
 }
 
-void
-updateHeight (Water  *w)
-{
-    int offset;
-	
-    int i;
-	
-    if (!w)
-	return;
-    offset = w->nSVer/2 + 1;
-	
-    for (i = 0; i < w->nSVer + (w->nWVer / 2); i++)
-        setAmplitude(&w->vertices[i], w->bh, w->wave1, w->wave2, w->wa,
-		     w->swa, w->wf, w->swf);
-}
-
-void
-updateWater (CompScreen *s, float time)
-{
-    SNOWGLOBE_SCREEN (s);
-    CUBE_SCREEN (s);
-
-    int sDiv = 0;
-    int size = s->hsize * cs->nOutput;
-
-    if (!as->water)
-	as->water = genWater (size, sDiv, cs->distance, -0.5);
-
-    if (!as->water)
-	return;
-
-
-
-    if (as->water->size != size || as->water->sDiv != sDiv ||
-	as->water->distance != cs->distance)
-    {
-	freeWater (as->water);
-	as->water = genWater (size, sDiv, cs->distance, -0.5);
-
-	if (!as->water)
-	    return;
-    }
-
-    as->water->wave1 += 0;
-    as->water->wave2 += 0;
-
-    as->water->wave1 = 0;
-    as->water->wave2 = 0;
-    as->water->bh  = 0.5;
-
-	as->water->wa  = 0.0;
-	as->water->swa = 0.0;
-	as->water->wf  = 0.0;
-	as->water->swf = 0.0;
-
-    }
-
-    as->water->bh  = -0.5 + snowglobeGetWaterHeight (s);
-}
-
-void
-updateGround (CompScreen *s, float time)
-{
-    SNOWGLOBE_SCREEN (s);
-    CUBE_SCREEN (s);
-
-    int sDiv = snowglobeGetGridQuality (s);
-    int size = s->hsize * cs->nOutput;
-
-    Bool update = FALSE;
-
-    if (!as->ground)
-    {
-	as->ground = genWater (size, sDiv, cs->distance, -0.5);
-	update = TRUE;
-    }
-
-    if (!as->ground)
-	return;
-
-    if (as->ground->size != size || as->ground->sDiv != sDiv ||
-	as->ground->distance != cs->distance)
-    {
-	freeWater (as->ground);
-	as->ground = genWater (size, sDiv, cs->distance, -0.5);
-
-	update = TRUE;
-	if (!as->ground)
-	    return;
-    }
-
-    if (!update)
-	return;
-
-    as->ground->wave1 = (float)(rand() & 15) / 15.0;
-    as->ground->wave2 = (float)(rand() & 15) / 15.0;
-
-    as->ground->bh  = -0.45;
-    as->ground->wa  = 0.1;
-    as->ground->swa = 0.02;
-    as->ground->wf  = 2.0;
-    as->ground->swf = 10.0;
-
-    updateHeight (as->ground);
-}
-
-void
+static void
 deformCylinder(CompScreen *s, Water  *w, float progress)
 {
     SNOWGLOBE_SCREEN (s);
@@ -552,6 +446,186 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
     }
     
     
+}
+
+void
+updateHeight (Water  *w, Bool rippleEffect)
+{
+    int offset;
+
+    int i;
+    
+    if (!w)
+	return;
+
+    offset = w->nSVer/2 + 1;
+    rippleEffect = (rippleEffect && w->rippleFactor);
+    
+    for (i = 0; i < w->nSVer; i++)
+	setAmplitude(&w->vertices[i], w->bh, w->wave1, w->wave2, w->wa,
+	             w->swa, w->wf, w->swf,
+	             (rippleEffect ? w->rippleFactor[i] : 0),
+	             (rippleEffect ? w->rippleFactor[(i+offset)%w->nSVer] : 0) );
+    
+    for (i = w->nSVer; i < w->nSVer + (w->nWVer / 2); i++)
+        setAmplitude(&w->vertices[i], w->bh, w->wave1, w->wave2, w->wa,
+		     w->swa, w->wf, w->swf, 0, 0);
+}
+
+void
+updateDeformation (CompScreen *s, int currentDeformation)
+{
+    SNOWGLOBE_SCREEN (s);
+    CUBE_SCREEN (s);
+    
+    static const float floatErr = 0.0001;
+
+    Bool deform = FALSE;
+
+    float progress, dummy;
+    (*cs->getRotation) (s, &dummy, &dummy, &progress);
+
+    
+    if (currentDeformation == DeformationCylinder)
+    {
+	if (fabsf(1.0f - progress) < floatErr)
+	    progress = 1.0f;
+
+	if (as->oldProgress != 1.0f || progress != 1.0f)
+	{
+	    deform = TRUE;
+	    as->oldProgress = progress;
+	}
+    }
+    else if (as->oldProgress != 0.0f)
+    {
+	if (fabsf(progress) < floatErr ||
+		progress >= as->oldProgress + floatErr ||
+		getDeformationMode(s) == DeformationNone)
+	    progress = 0.0f;
+
+	deform = TRUE;
+
+	as->oldProgress = progress;
+    }
+
+    if (deform)
+    {
+	if (snowglobeGetShowWater (s) || snowglobeGetShowWaterWire (s))
+	    deformCylinder(s, as->water, progress);
+
+	if (snowglobeGetShowGround (s))
+	{
+	    deformCylinder(s, as->ground, progress);
+	    updateHeight (as->ground, FALSE);
+	}
+    }
+}
+
+void
+updateWater (CompScreen *s, float time)
+{
+    SNOWGLOBE_SCREEN (s);
+    CUBE_SCREEN (s);
+
+    int sDiv = (snowglobeGetRenderWaves (s))?
+	       snowglobeGetGridQuality (s) : 0;
+    int size = as->hsize;
+
+    if (!as->water)
+	as->water = genWater (size, sDiv, cs->distance, -0.5, snowglobeGetWaveRipple (s));
+
+    if (!as->water)
+	return;
+
+    if (as->water->size != size || as->water->sDiv != sDiv ||
+	as->water->distance != cs->distance || (snowglobeGetWaveRipple (s) && !as->water->rippleFactor))
+    {
+	freeWater (as->water);
+	as->water = genWater (size, sDiv, cs->distance, -0.5, snowglobeGetWaveRipple (s));
+
+	if (!as->water)
+	    return;
+    }
+
+    if (snowglobeGetWaveRipple(s))
+    {
+	as->water->rippleTimer -= (int) (time * 1000);
+	if (as->water->rippleTimer <= 0)
+	{
+	    as->water->rippleTimer += 100;
+	    updateRipple(as->water, size);
+	}
+    }
+    
+    as->water->wave1 += time * as->speedFactor;
+    as->water->wave2 += time * as->speedFactor;
+
+    as->water->wave1 = fmodf (as->water->wave1, 2 * M_PI);
+    as->water->wave2 = fmodf (as->water->wave2, 2 * M_PI);
+
+    if (snowglobeGetRenderWaves (s))
+    {
+	as->water->wa  = snowglobeGetWaveAmplitude (s);
+	as->water->swa = snowglobeGetSmallWaveAmplitude (s);
+ 	as->water->wf  = snowglobeGetWaveFrequency (s);
+	as->water->swf = snowglobeGetSmallWaveFrequency (s);
+    }
+    else
+    {
+	as->water->wa  = 0.0;
+	as->water->swa = 0.0;
+ 	as->water->wf  = 0.0;
+	as->water->swf = 0.0;
+    }
+
+    as->water->bh  = -0.5 + snowglobeGetWaterHeight (s);
+}
+
+void
+updateGround (CompScreen *s, float time)
+{
+    SNOWGLOBE_SCREEN (s);
+    CUBE_SCREEN (s);
+
+    int sDiv = snowglobeGetGridQuality (s);
+    int size = as->hsize;
+
+    Bool update = FALSE;
+
+    if (!as->ground)
+    {
+	as->ground = genWater (size, sDiv, cs->distance, -0.5, FALSE);
+	update = TRUE;
+    }
+
+    if (!as->ground)
+	return;
+
+    if (as->ground->size != size || as->ground->sDiv != sDiv ||
+	as->ground->distance != cs->distance)
+    {
+	freeWater (as->ground);
+	as->ground = genWater (size, sDiv, cs->distance, -0.5, FALSE);
+
+	update = TRUE;
+	if (!as->ground)
+	    return;
+    }
+
+    if (!update)
+	return;
+
+    as->ground->wave1 = (float)(rand() & 15) / 15.0;
+    as->ground->wave2 = (float)(rand() & 15) / 15.0;
+
+    as->ground->bh  = -0.45;
+    as->ground->wa  = 0.1;
+    as->ground->swa = 0.02;
+    as->ground->wf  = 2.0;
+    as->ground->swf = 10.0;
+
+    updateHeight (as->ground, FALSE);
 }
 
 void
