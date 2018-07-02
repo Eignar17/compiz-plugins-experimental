@@ -167,6 +167,8 @@ genWater (int size, int sDiv, float distance, float bottom)
     int    i;
     float  ang, r, aStep;
     int    nVer, nRow, nIdx, nWVer, nWIdx;;
+    float ratioRadiusToSideDist;
+
     Vertex a = {{ 0.0, 0.0, 0.0 }};
     Vertex b = {{ 0.0, 0.0, 0.0 }};
     Vertex c = {{ 0.0, 0.0, 0.0 }};
@@ -346,6 +348,8 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 
     nWVer = pow (2, subdiv + 1) + 2;
 
+    ratioRadiusToSideDist = as->radius*as->ratio/as->sideDistance;
+
     r = cs->distance / cosf (M_PI / size);
     ang = M_PI / size;
     aStep = 2 * M_PI / size;
@@ -391,7 +395,7 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 		v[br + j].v[2] = (rb[2] + (j * ri[2]));
 
 		float th = atan2(v[br + j].v[0], v[br + j].v[2]);
-		float factor = progress*(as->radius*as->ratio/as->sideDistance-1)*fabsf(cosf(size*th/2))+1;
+		float factor = progress*(ratioRadiusToSideDist-1)*fabsf(cosf(size*th/2))+1;
 		
 		v[br + j].v[0] *= factor;
 		v[br + j].v[2] *= factor;
@@ -421,7 +425,7 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 		    
 		}
 		float th = atan2(lVer[i].v[0], lVer[i].v[2]);
-		float factor = progress*(as->radius*as->ratio/as->sideDistance-1)*fabsf(cosf(size*th/2))+1;
+		float factor = progress*(ratioRadiusToSideDist-1)*fabsf(cosf(size*th/2))+1;
 		    
 		for (k = 0; k < 3; k+=2)
 		    lVer[i].v[k] *= factor;
@@ -444,8 +448,155 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 	
 	ang += aStep;
     }
+
+static void
+deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
+{
+    ATLANTIS_SCREEN (s);
+    CUBE_SCREEN (s);
+
+    int          nVer, nWVer, nRow, nRowS, subdiv;
+    Vertex       *v;
+    int          i, j, k, l;
+    int          br;
+
+    float  ang, r, aStep;
     
+    Vertex       *wv;
     
+    int bottom = -0.5, size = as->hsize;
+ 
+    float ratioRadiusToSideDist, sphereRadiusFactor, sphereRadiusFactor2;
+   
+    Vertex a = {{ 0.0, 0.0, 0.0 }};
+    Vertex b = {{ 0.0, 0.0, 0.0 }};
+    Vertex c = {{ 0.0, 0.0, 0.0 }};
+    Vertex d = {{ 0.0, bottom, 0.0 }};
+    Vertex e = {{ 0.0, bottom, 0.0 }};
+    
+    float    vab[3], vac[3], vcd[3], rb[3], re[3], ri[3];
+
+    if (!w)
+	return;
+    if (w->sDiv < 0)
+	return;
+    if (!w->vertices)
+	return;
+    if (w->size!=size)
+	return;
+
+    subdiv = w->sDiv;
+    nRow = (subdiv)?(2 << (subdiv - 1)) + 1 : 2;
+    nVer = (nRow * (nRow + 1)) / 2;
+
+    nWVer = pow (2, subdiv + 1) + 2;
+
+    ratioRadiusToSideDist = as->radius*as->ratio/as->sideDistance;
+	
+    sphereRadiusFactor  = as->radius/100000;
+    sphereRadiusFactor  = hypotf(sphereRadiusFactor, 0.5f)/sphereRadiusFactor;
+    sphereRadiusFactor2 = (sphereRadiusFactor-1)*cosf(waterBottom*PI)+1;
+    sphereRadiusFactor  = (sphereRadiusFactor-1)*cosf(w->bh*PI)+1;
+    
+    r = cs->distance / cosf (M_PI / size);
+    ang = M_PI / size;
+    aStep = 2 * M_PI / size;
+    
+    wv = w->vertices + (size * nVer);
+
+    for (l = 0; l < size; l++)
+    {
+	v =   w->vertices + (l * nVer);
+
+	d.v[0] = b.v[0] = sin (ang - aStep) * r;
+	d.v[2] = b.v[2] = cos (ang - aStep) * r;
+
+	e.v[0] = c.v[0] = sin (ang) * r;
+	e.v[2] = c.v[2] = cos (ang) * r;
+
+	for (i = 0; i < 3; i++)
+	{
+	    vab[i] = b.v[i] - a.v[i];
+	    vab[i] /= nRow - 1.0;
+	    vac[i] = c.v[i] - a.v[i];
+	    vac[i] /= nRow - 1.0;
+	}
+
+	//v[0] = a;
+
+
+	for (i = 1; i < nRow; i++)
+	{
+	    br = (i * (i + 1)) / 2;
+	    for (k = 0; k < 3; k++)
+	    {
+		rb[k] = a.v[k] + (i * vab[k]);
+		re[k] = a.v[k] + (i * vac[k]);
+		ri[k] = re[k] - rb[k];
+		ri[k] /= i;
+	    }
+	    
+	    for (j = 0; j <= i; j++)
+	    {
+		v[br + j].v[0] = (rb[0] + (j * ri[0]));
+		v[br + j].v[2] = (rb[2] + (j * ri[2]));
+
+		float th = atan2(v[br + j].v[0], v[br + j].v[2]);
+
+		float factor = progress*(ratioRadiusToSideDist-1)*
+			       (fabsf(cosf(size*th/2)))+1;
+		factor *= sphereRadiusFactor;
+		
+		v[br + j].v[0] *= factor;
+		v[br + j].v[2] *= factor;
+	    }
+	}
+	
+	Vertex *lVer = wv + (l * nWVer / 2);
+	Vertex *hVer = wv + ((l + size) * nWVer / 2);
+	
+	/*side walls */
+	    nRowS = pow (2, subdiv);
+
+	    for (i = 0; i < 3; i++)
+	    {
+		vab[i] = c.v[i] - b.v[i];
+		vab[i] /= nRowS;
+		vcd[i] = e.v[i] - d.v[i];
+		vcd[i] /= nRowS;
+	    }
+
+	    for (i = 0; i <= nRowS; i++)
+	    {
+		for (k = 0; k < 3; k+=2)
+		{
+		    lVer[i].v[k] = b.v[k] + (i * vab[k]);
+		    hVer[i].v[k] = d.v[k] + (i * vcd[k]);
+		}
+		float th = atan2(lVer[i].v[0], lVer[i].v[2]);
+		float lFactor = progress*(ratioRadiusToSideDist-1)*
+			        (fabsf(cosf(size*th/2)))+1;
+		float hFactor = lFactor*sphereRadiusFactor2;
+		lFactor *= sphereRadiusFactor;
+		
+		for (k = 0; k < 3; k+=2)
+		    lVer[i].v[k] *= lFactor;
+		
+		for (k = 0; k < 3; k+=2)
+		    hVer[i].v[k] *= hFactor;
+
+
+		lVer[i].n[0] = (1-progress)*sinf(ang) + progress*sinf(th);
+		lVer[i].n[1] = 0;
+		lVer[i].n[2] = (1-progress)*cosf(ang) + progress*cosf(th);
+		
+		hVer[i].n[0] = lVer[i].n[0];
+		hVer[i].n[1] = lVer[i].n[1];
+		hVer[i].n[2] = lVer[i].n[2];
+	    }
+	
+	ang += aStep;
+    }
 }
 
 void
@@ -486,7 +637,8 @@ updateDeformation (CompScreen *s, int currentDeformation)
     (*cs->getRotation) (s, &dummy, &dummy, &progress);
 
     
-    if (currentDeformation == DeformationCylinder)
+    if (currentDeformation == DeformationCylinder ||
+	currentDeformation == DeformationSphere)
     {
 	if (fabsf(1.0f - progress) < floatErr)
 	    progress = 1.0f;
@@ -512,11 +664,33 @@ updateDeformation (CompScreen *s, int currentDeformation)
     if (deform)
     {
 	if (snowglobeGetShowWater (s) || snowglobeGetShowWaterWire (s))
-	    deformCylinder(s, as->water, progress);
+	{
+	    switch (currentDeformation)
+	    {
+	    case DeformationCylinder :
+		deformCylinder(s, as->water, progress);
+		break;
+		
+	    case DeformationSphere :
+		deformSphere(s, as->water, progress,
+		             (atlantisGetShowGround (s) ? as->ground->bh :
+		              -0.5));
+	    }    
+	}
 
 	if (snowglobeGetShowGround (s))
 	{
-	    deformCylinder(s, as->ground, progress);
+	    switch (currentDeformation)
+	    {
+	    case DeformationCylinder :
+		deformCylinder(s, as->ground, progress);
+		break;
+		
+	    case DeformationSphere :
+		deformSphere(s, as->ground, progress, -0.5);
+	    }
+
+
 	    updateHeight (as->ground, FALSE);
 	}
     }
