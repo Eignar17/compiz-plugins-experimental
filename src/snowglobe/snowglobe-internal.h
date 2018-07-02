@@ -83,9 +83,11 @@ typedef struct _Water
     unsigned int nSIdx;
     unsigned int nWVer;
     unsigned int nWIdx;
+    unsigned int nBIdx;
 
     unsigned int nWVer2;
     unsigned int nWIdx2;
+    unsigned int nBIdx2;
 
     float    wave1;
     float    wave2;
