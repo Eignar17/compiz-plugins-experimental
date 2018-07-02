@@ -328,20 +328,16 @@ snowglobePaintInside (CompScreen *s,
     }
 
     glPopMatrix();
-
-    if (snowglobeGetShowWater(s))
-    {
-	glEnable(GL_CULL_FACE);
-	glColor4usv(snowglobeGetWaterColor(s));
-	drawWater (as->water, snowglobeGetWaterGetShowWater (s),
-		snowglobeGetShowWaterWire (s), drawDeformation);
-    }
-    if (drawDeformation!=DeformationCylinder && drawDeformation!=DeformationSphere)
-    {
+     }
     if (snowglobeGetShowGround(s))
     {
-	glColor4f(0.8, 0.8, 0.8, 1.0);
-	drawBottomGround(s->hsize * cs->nOutput, cs->distance, -0.4999);
+	setGroundMaterial (atlantisGetGroundColor (s));
+	drawBottomGround (as->ground, cs->distance, -0.5, drawDeformation);
+     }
+    else if (atlantisGetShowWater(s))
+    {
+	setWaterMaterial (atlantisGetWaterColor (s));
+	drawBottomWater (as->water, cs->distance, -0.5, drawDeformation);
     }
 
     glDisable(GL_LIGHT1);
