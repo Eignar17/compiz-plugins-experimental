@@ -203,7 +203,8 @@ snowglobePaintInside (CompScreen *s,
 
     int i;
 	
-    int currentDeformation = getCurrentDeformation(s);
+    int drawDeformation = (as->oldProgress==0.0f ? getCurrentDeformation(s) :
+						   getDeformationMode (s) );
 	
     as->waterHeight = snowglobeGetWaterHeight(s)*100000-50000;
 
@@ -223,9 +224,9 @@ snowglobePaintInside (CompScreen *s,
     if (snowglobeGetShowWater(s))
 	updateHeight(as->water);
     {
-	updateDeformation (s, currentDeformation);
+	updateDeformation (s, drawDeformation);
 	updateHeight (as->water, snowglobeGetShowGround (s) ? as->ground : NULL,
-	              snowglobeGetWaveRipple(s), currentDeformation);
+	              atlantisGetWaveRipple(s), drawDeformation);
      }	
     sA.yRotate += cs->invert * (360.0f / size) *
 		 (cs->xRotations - (s->x* cs->nOutput));
@@ -261,16 +262,16 @@ snowglobePaintInside (CompScreen *s,
     if (snowglobeGetShowWater(s))
     {
 	glColor4usv(snowglobeGetWaterColor(s));
-	drawWater(as->water, TRUE, FALSE);
+	drawWater (as->water, TRUE, FALSE, drawDeformation);
     }
     glCullFace(cull);
 
     if (snowglobeGetShowGround (s) && !snowglobeIsCylinder(s))
     {
 	glColor4f(0.8, 0.8, 0.8, 1.0);
-	    drawGround (as->water, as->ground, currentDeformation);
+	    drawGround (as->water, as->ground, drawDeformation);
  	else
-	    drawGround (NULL, as->ground, currentDeformation);
+	    drawGround (NULL, as->ground, drawDeformation);
 
     }
 
@@ -332,10 +333,10 @@ snowglobePaintInside (CompScreen *s,
     {
 	glEnable(GL_CULL_FACE);
 	glColor4usv(snowglobeGetWaterColor(s));
-	drawWater (as->water, TRUE, FALSE, currentDeformation);
+	drawWater (as->water, snowglobeGetWaterGetShowWater (s),
+		snowglobeGetShowWaterWire (s), drawDeformation);
     }
-
-    if (currentDeformation!=DeformationCylinder && currentDeformation!=DeformationSphere)
+    if (drawDeformation!=DeformationCylinder && drawDeformation!=DeformationSphere)
     {
     if (snowglobeGetShowGround(s))
     {
