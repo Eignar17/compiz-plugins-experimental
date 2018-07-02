@@ -332,7 +332,7 @@ snowglobePaintInside (CompScreen *s,
 	drawWater(as->water, snowglobeGetShowWater(s), 0);
     }
 
-    if (currentDeformation!=DeformationCylinder)
+    if (currentDeformation!=DeformationCylinder && currentDeformation!=DeformationSphere)
     {
     if (snowglobeGetShowGround(s))
     {
