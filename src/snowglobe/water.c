@@ -156,7 +156,7 @@ genTriWall (Vertex       *lVer,
 
     for (i = 0; i < nRow; i++)
     {
-	indices[(i * 6)] = idxBaseL + i;
+	indices[(i * 6)]     = idxBaseL + i;
 	indices[(i * 6) + 1] = idxBaseH + i;
 	indices[(i * 6) + 2] = idxBaseH + i + 1;
 	indices[(i * 6) + 3] = idxBaseL + i + 1;
@@ -202,8 +202,10 @@ genWater (int size, int sDiv, float distance, float bottom)
     nWIdx = pow (2, sDiv + 1) * 3;
     nWVer = pow (2, sDiv + 1) + 2;
 
+    w->nBIdx = nRow * size;
+
     w->nVertices  = (nVer + nWVer) * size;
-    w->nIndices   = nIdx + (nWIdx) * size + (nWIdx * size / 2);
+    w->nIndices   = nIdx + (nWIdx) * size + w->nBIdx;
 
     w->nSVer = nVer * size;
     w->nSIdx = nIdx * size;
@@ -277,6 +279,12 @@ freeWater (Water *w)
 	free (w->vertices2);
     if (w->indices2)
 	free (w->indices2);
+
+    w->vertices     = NULL;
+    w->vertices2    = NULL;
+    w->indices      = NULL;
+    w->indices2     = NULL;
+    w->rippleFactor = NULL;
 }
 
 static void
@@ -511,7 +519,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
     //Vertex d = {{ 0.0, bottom, 0.0 }};
     //Vertex e = {{ 0.0, bottom, 0.0 }};
 
-    float    vab[3];//, vac[3];
+    float    vab[3];
 
     int c1 = 1; /* counter for how many points already indexed */
     int c2 = 1; /* similar to c but for indices add one for each layer */
@@ -563,6 +571,8 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
     w->nWVer2 = nWVer2 * size;
     w->nWIdx2 = nWIdx2 * size;
 
+    w->nBIdx2 = nRow * size;
+
     if (!w->vertices2)
     {
 	w->vertices2 = calloc (1, sizeof (Vertex) * w->nWVer2);
@@ -572,7 +582,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
 
     if (!w->indices2)
     {
-	w->indices2 = calloc (1, sizeof (int) * (w->nWIdx2 + (nWIdx * size / 2)));
+	w->indices2 = calloc (1, sizeof (int) * (w->nWIdx2 + w->nBIdx2));
     	if (!w->indices2)
     	    return;
     }
@@ -586,7 +596,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
     for (i = 1; i<= nRow; i++)
     {
 	ang = PI/size;
-	dist = i * r/nRow;
+	dist = i * r / nRow;
 	factor = dist * sphereRadiusFactor2;
 
 	for (j=0; j<size; j++)
@@ -670,9 +680,11 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
 
 		float p = ((float) j)/nRow;
 
-		hVer[i].n[0] = p*((1-progress)*sinf (ang - aStep/2) + progress*sinf(th));
+		hVer[i].n[0] = p*((1-progress)*sinf (ang - aStep/2) + 
+			       progress*sinf(th));
 		hVer[i].n[1] = (1-p);
-		hVer[i].n[2] = p*((1-progress)*cosf (ang - aStep/2) + progress*cosf(th));
+		hVer[i].n[2] = p*((1-progress)*cosf (ang - aStep/2) + 
+			       progress * cosf(th));
 
 		float hFactor = r * (sphereRadiusFactor *
 			cosf((w->bh-j*(w->bh-waterBottom)/(nRow))*PI)+1);
@@ -685,13 +697,13 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
 	unsigned int * indices = w->indices2 + (l * nWIdx);
 	unsigned int idxBaseL = (l * nWVer / 2);
 
-	for (j=0; j<nRow; j++)
+	for (j = 0; j < nRow; j++)
 	{
 	    unsigned int idxBaseH = idxBaseL + size * nWVer / 2;
 
 	    for (i = 0; i < nRowS; i++)
 	    {
-		indices[(i * 6)] = idxBaseL + i;
+		indices[(i * 6)]     = idxBaseL + i;
 		indices[(i * 6) + 1] = idxBaseH + i;
 		indices[(i * 6) + 2] = idxBaseH + i + 1;
 		indices[(i * 6) + 3] = idxBaseL + i + 1;
@@ -699,7 +711,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool g
 		indices[(i * 6) + 5] = idxBaseH + i + 1;
 	    }
 	    idxBaseL = idxBaseH;
-	    indices += 2*nWIdx2 / (nRow);
+	    indices += 2 * nWIdx2 / nRow;
 	}
 
 
@@ -728,7 +740,7 @@ updateHeight (Water  *w, Water *w2, Bool rippleEffect, int currentDeformation)
     if (!w)
 	return;
 
-    offset = w->nSVer/2 + 1;
+    offset = w->nSVer / 2 + 1;
     rippleEffect = (rippleEffect && w->rippleFactor);
 
     useOtherWallVertices = (currentDeformation == DeformationSphere &&
@@ -1098,11 +1110,7 @@ drawGround (Water *w, Water *g, int currentDeformation)
     if (currentDeformation == DeformationSphere && g->vertices2 && g->indices2)
     {
 	v = (float *) g->vertices2;
-
-	if (w)
-	    n = (float *) w->vertices + 6 * g->nSIdx;
-	else
-	    n = (float *) g->vertices2;
+	n = (float *) g->vertices2;
 	
 	glNormalPointer (GL_FLOAT, 6 * sizeof (float), n + 3);
 	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
@@ -1119,13 +1127,13 @@ drawGround (Water *w, Water *g, int currentDeformation)
 static void fillBottom (Water *w, float distance, float bottom, int currentDeformation)
 {
     int   i;
-    int   nRow;
     float *v;
     int	  size = w->size;
 
+    glDisableClientState (GL_TEXTURE_COORD_ARRAY);
+
     if (currentDeformation==DeformationCylinder)
     {
-	nRow = pow (2, w->sDiv);
 
 	v = (float *) w->vertices;
 
@@ -1134,20 +1142,23 @@ static void fillBottom (Water *w, float distance, float bottom, int currentDefor
 	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
 	glDisableClientState (GL_NORMAL_ARRAY);
 
-	glDrawElements (GL_TRIANGLE_FAN, size * nRow, GL_UNSIGNED_INT, w->indices + w->nSIdx + w->nWIdx);
+	glDrawElements (GL_TRIANGLE_FAN, w->nBIdx,
+			GL_UNSIGNED_INT, w->indices + w->nSIdx + w->nWIdx);
     }
-    else if (currentDeformation==DeformationSphere)
+    else if (currentDeformation == DeformationSphere &&
+	     w->vertices2 && w->indices2)
     {
-	nRow = pow (2, w->sDiv);
 
 	v = (float *) w->vertices2;
 
-	glNormal3f (0, -1, 0);
-
 	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+
 	glDisableClientState (GL_NORMAL_ARRAY);
 
-	glDrawElements (GL_TRIANGLE_FAN, size * nRow, GL_UNSIGNED_INT, w->indices2 + w->nWIdx2);
+	glNormal3f (0, -1, 0);
+
+	glDrawElements (GL_TRIANGLE_FAN, w->nBIdx2,
+			GL_UNSIGNED_INT, w->indices2 + w->nWIdx2);
     }
     else
     {
@@ -1161,14 +1172,14 @@ static void fillBottom (Water *w, float distance, float bottom, int currentDefor
 
 	for (i = 0; i <= size; i++)
 	{
-	    glVertex3f (sin (ang) * r, bottom, cos (ang) * r);
+	    glVertex3f (sinf (ang) * r, bottom, cosf (ang) * r);
 
 	    ang -= aStep;
 	}
 	glEnd ();
     }
 
-
+    glEnableClientState (GL_TEXTURE_COORD_ARRAY);
 }
 
 void
