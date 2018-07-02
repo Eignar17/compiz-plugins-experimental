@@ -622,23 +622,25 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 		float lFactor = progress*(ratioRadiusToSideDist-1)*
 			        (fabsf(cosf(size*th/2)))+1;		
 		//lFactor *= sphereRadiusFactor * cosf(w->bh*PI)+1;
-		
+
+		lVer[i].n[0] = (1-progress)*sinf(ang) + progress*sinf(th);
+		lVer[i].n[1] = 0;
+		lVer[i].n[2] = (1-progress)*cosf(ang) + progress*cosf(th);
+
 		for (j=nRow-1; j>=0; j--)
                 {
 		    Vertex *hVer = lVer + j * (size * nWVer2 / nRow);
 		    
 		    for (k = 0; k < 3; k++)
+		    {
 			hVer[i].v[k] = lVer[i].v[k];
-		    
+			hVer[i].n[k] = lVer[i].n[k];
+		    }
+    
 		    float hFactor = lFactor * (sphereRadiusFactor * cosf((w->bh-j*(w->bh-waterBottom)/(nRow-1))*PI)+1);
 		    
 		    for (k = 0; k < 3; k+=2)
 			hVer[i].v[k] *= hFactor;
-
-
-		    hVer[i].n[0] = (1-progress)*sinf(ang) + progress*sinf(th);
-		    hVer[i].n[1] = 0;
-		    hVer[i].n[2] = (1-progress)*cosf(ang) + progress*cosf(th);
 		}
 
 	    }
@@ -739,29 +741,39 @@ updateDeformation (CompScreen *s, int currentDeformation)
     float progress, dummy;
     (*cs->getRotation) (s, &dummy, &dummy, &progress);
 
-    
-    if (currentDeformation == DeformationCylinder ||
-	currentDeformation == DeformationSphere)
+    if (currentDeformation == DeformationNone)
     {
-	if (fabsf(1.0f - progress) < floatErr)
-	    progress = 1.0f;
-
-	if (as->oldProgress != 1.0f || progress != 1.0f)
-	{
-	    deform = TRUE;
-	    as->oldProgress = progress;
+	if (as->oldProgress==0.0f)
+	    return;
+	
+	as->oldProgress = 0.0f;
+	progress = 0.0f;
 	}
     }
-    else if (as->oldProgress != 0.0f)
+    else
     {
-	if (fabsf(progress) < floatErr ||
-		progress >= as->oldProgress + floatErr ||
-		getDeformationMode(s) == DeformationNone)
+	if (fabsf(progress) < floatErr)
 	    progress = 0.0f;
-
-	deform = TRUE;
-
-	as->oldProgress = progress;
+	else if (fabsf(1.0f - progress) < floatErr)
+	    progress = 1.0f;
+	    
+	if ((as->oldProgress!=0.0f || progress!=0.0f) &&
+		(as->oldProgress!=1.0f || progress!=1.0f))
+	{
+	    if (progress==0.0f || progress==1.0f)
+	    {
+		if (as->oldProgress!=progress)
+		{
+		    deform = TRUE;
+		    as->oldProgress = progress;
+		}
+	    }
+	    else if (fabsf(as->oldProgress-progress)>= floatErr)
+	    {
+		deform = TRUE;
+		as->oldProgress = progress;
+	    }
+	}
     }
 
     if (deform)
@@ -770,6 +782,7 @@ updateDeformation (CompScreen *s, int currentDeformation)
 	{
 	    switch (currentDeformation)
 	    {
+	    case DeformationNone :
 	    case DeformationCylinder :
 		deformCylinder(s, as->water, progress);
 		break;
@@ -785,14 +798,15 @@ updateDeformation (CompScreen *s, int currentDeformation)
 	{
 	    switch (currentDeformation)
 	    {
+	    case DeformationNone :
+		progress = 0.0f;
 	    case DeformationCylinder :
-		deformCylinder(s, as->ground, progress);
+		deformCylinder (s, as->ground, progress);
 		break;
 		
 	    case DeformationSphere :
-		deformSphere(s, as->ground, progress, -0.5);
+		deformSphere (s, as->ground, progress, -0.5);
 	    }
-
 
 	    updateHeight (as->ground, NULL, FALSE, currentDeformation);
 	}
