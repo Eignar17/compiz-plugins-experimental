@@ -72,6 +72,10 @@ typedef struct _Water
     Vertex       *vertices;
     unsigned int *indices;
 
+    
+    Vertex *vertices2; /* for extra side wall detail in sphere deformation */
+    unsigned int *indices2;
+
     unsigned int nVertices;
     unsigned int nIndices;
 
@@ -79,6 +83,9 @@ typedef struct _Water
     unsigned int nSIdx;
     unsigned int nWVer;
     unsigned int nWIdx;
+
+    unsigned int nWVer2;
+    unsigned int nWIdx2;
 
     float    wave1;
     float    wave2;
@@ -133,7 +140,7 @@ void
 updateGround (CompScreen *s, float time);
 
 void
-updateHeight (Water *w);
+updateHeight(Water *w, Water *w2, Bool, int currentDeformation);
 
 void
 updateDeformation (CompScreen *s, int currentDeformation);
@@ -142,10 +149,10 @@ void
 freeWater (Water *w);
 
 void
-drawWater (Water *w, Bool full, Bool wire);
+drawWater(Water *w, Bool full, Bool wire, int currentDeformation);
 
 void
-drawGround (Water *w, Water *g);
+drawGround(Water *w, Water *g, int currentDeformation);
 
 void
 drawBottomGround (int size, float distance, float bottom);
