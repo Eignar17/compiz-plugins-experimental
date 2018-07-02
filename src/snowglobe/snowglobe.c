@@ -379,13 +379,19 @@ snowglobePreparePaintScreen (CompScreen *s,
     updateWater (s, (float)ms / 1000.0);
     updateGround (s, (float)ms / 1000.0);
 	
-    if (currentDeformation==DeformationCylinder && as->oldProgress>0.9)
+    if (currentDeformation == DeformationCylinder && as->oldProgress>0.9)
     {
 	as->hsize*=32/as->hsize;
 	as->arcAngle = 360.0f / as->hsize;
 	as->sideDistance = as->radius * as->ratio;
     }
-	
+    else if (currentDeformation == DeformationSphere)
+    {
+	as->hsize*=32/as->hsize;
+	as->arcAngle = 360.0f / as->hsize;
+	as->sideDistance = as->radius * as->ratio;
+	//FIX needs to be done per fish according to height
+    }	
     for (i = 0; i < as->numSnowflakes; i++)
     {
 	SnowflakeDrift(s, i);
