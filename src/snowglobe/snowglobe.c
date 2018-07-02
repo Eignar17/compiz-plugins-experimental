@@ -226,7 +226,7 @@ snowglobePaintInside (CompScreen *s,
     {
 	updateDeformation (s, drawDeformation);
 	updateHeight (as->water, snowglobeGetShowGround (s) ? as->ground : NULL,
-	              atlantisGetWaveRipple(s), drawDeformation);
+	              snowglobeGetWaveRipple(s), drawDeformation);
      }	
     sA.yRotate += cs->invert * (360.0f / size) *
 		 (cs->xRotations - (s->x* cs->nOutput));
