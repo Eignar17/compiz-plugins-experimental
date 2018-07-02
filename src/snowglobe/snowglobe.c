@@ -331,12 +331,12 @@ snowglobePaintInside (CompScreen *s,
      }
     if (snowglobeGetShowGround(s))
     {
-	setGroundMaterial (atlantisGetGroundColor (s));
+	setGroundMaterial (snowglobeGetGroundColor (s));
 	drawBottomGround (as->ground, cs->distance, -0.5, drawDeformation);
      }
-    else if (atlantisGetShowWater(s))
+    else if (snowglobeGetShowWater(s))
     {
-	setWaterMaterial (atlantisGetWaterColor (s));
+	setWaterMaterial (snowglobeGetWaterColor (s));
 	drawBottomWater (as->water, cs->distance, -0.5, drawDeformation);
     }
 
