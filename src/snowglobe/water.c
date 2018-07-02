@@ -170,7 +170,8 @@ genWater (int size, int sDiv, float distance, float bottom)
 {
 
     Water  *w;
-    int    i;
+    int    i, j;
+
     float  ang, r, aStep;
     int    nVer, nRow, nIdx, nWVer, nWIdx;;
     float ratioRadiusToSideDist;
@@ -202,7 +203,7 @@ genWater (int size, int sDiv, float distance, float bottom)
     nWVer = pow (2, sDiv + 1) + 2;
 
     w->nVertices  = (nVer + nWVer) * size;
-    w->nIndices   = (nIdx + nWIdx) * size;
+    w->nIndices   = nIdx + (nWIdx) * size + (nWIdx * size / 2);
 
     w->nSVer = nVer * size;
     w->nSIdx = nIdx * size;
@@ -324,27 +325,36 @@ setAmplitude (Vertex *v,
 static void
 deformCylinder(CompScreen *s, Water  *w, float progress)
 {
-    SNOWGLOBE_SCREEN (s);
+    ATLANTIS_SCREEN (s);
     CUBE_SCREEN (s);
 
     int          nVer, nWVer, nRow, nRowS, subdiv;
     Vertex       *v;
     int          i, j, k, l;
-    int          br;
 
     float  ang, r, aStep;
-    
+
     Vertex       *wv;
-    
-    int bottom = -0.5, size = as->hsize;
- 
-    Vertex a = {{ 0.0, 0.0, 0.0 }};
+
+    int size = as->hsize;
+
+    float ratioRadiusToSideDist;
+
+    //int bottom = -0.5;
+
+    //Vertex a = {{ 0.0, 0.0, 0.0 }};
     Vertex b = {{ 0.0, 0.0, 0.0 }};
     Vertex c = {{ 0.0, 0.0, 0.0 }};
-    Vertex d = {{ 0.0, bottom, 0.0 }};
-    Vertex e = {{ 0.0, bottom, 0.0 }};
-    
-    float    vab[3], vac[3], rb[3], re[3], ri[3];
+    //Vertex d = {{ 0.0, bottom, 0.0 }};
+    //Vertex e = {{ 0.0, bottom, 0.0 }};
+
+    float    vab[3];
+
+    int c1 = 1; /* counter for how many points already indexed */
+    int c2 = 1; /* similar to c but for indices add one for each layer */
+
+    float dist, x, y, dx, dy;
+
 
     if (!w)
 	return;
@@ -356,8 +366,7 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 	return;
 
     subdiv = w->sDiv;
-    nRow = (subdiv)?(2 << (subdiv - 1)) + 1 : 2;
-    nVer = (nRow * (nRow + 1)) / 2;
+    nRow = (subdiv)?(2 << (subdiv - 1)) : 1;
 
     nWVer = pow (2, subdiv + 1) + 2;
 
@@ -366,58 +375,74 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
     r = cs->distance / cosf (M_PI / size);
     ang = M_PI / size;
     aStep = 2 * M_PI / size;
-    
-    wv = w->vertices + (size * nVer);
+
+    wv = w->vertices + w->nSVer;
+
+    v =   w->vertices;
+
+    //v[0] = a;
+
+    /* new coordinates, spiralling around from centre */
+    for (i = 1; i<= nRow; i++)
+    {
+	ang = PI/size;
+	dist = i * r/nRow;
+
+	for (j=0; j<size; j++)
+	{
+	    x = cosf (ang);
+	    y = sinf (ang);
+
+	    ang -= aStep;
+	    dx = (cosf (ang) - x) / i;
+	    dy = (sinf (ang) - y) / i;
+
+	    c2 = i*j+c1;
+	    for (k=0; k< i; k++, c2++)
+	    {
+		v[c2].v[0] = y + k*dy;
+		v[c2].v[2] = x + k*dx;
+
+		v[c2].v[0] += progress*(sinf (ang+aStep-(k*aStep)/(i))-v[c2].v[0]);
+		v[c2].v[0] *= dist;
+
+		v[c2].v[2] += progress*(cosf (ang+aStep-(k*aStep)/(i))-v[c2].v[2]);
+		v[c2].v[2] *= dist;
+
+		/* translation not needed*/
+		/*
+		v[c2].v[0] += a[0];
+		v[c2].v[2] += a[2];
+		*/
+	    }
+	}
+
+	c1 += i * size;
+    }
+
+    ang = M_PI / size;
 
 
     for (l = 0; l < size; l++)
     {
 	v =   w->vertices + (l * nVer);
 
-	d.v[0] = b.v[0] = sin (ang - aStep) * r;
-	d.v[2] = b.v[2] = cos (ang - aStep) * r;
+	b.v[0] = sin (ang - aStep);
+	b.v[2] = cos (ang - aStep);
 
-	e.v[0] = c.v[0] = sin (ang) * r;
-	e.v[2] = c.v[2] = cos (ang) * r;
+	c.v[0] = sin (ang);
+	c.v[2] = cos (ang);
 
 	for (i = 0; i < 3; i++)
 	{
-	    vab[i] = b.v[i] - a.v[i];
+	    vab[i] = b.v[i];// - a.v[i];
 	    vab[i] /= nRow - 1.0;
-	    vac[i] = c.v[i] - a.v[i];
-	    vac[i] /= nRow - 1.0;
 	}
 
-	//v[0] = a;
 
-
-	for (i = 1; i < nRow; i++)
-	{
-	    br = (i * (i + 1)) / 2;
-	    for (k = 0; k < 3; k++)
-	    {
-		rb[k] = a.v[k] + (i * vab[k]);
-		re[k] = a.v[k] + (i * vac[k]);
-		ri[k] = re[k] - rb[k];
-		ri[k] /= i;
-	    }
-	    
-	    for (j = 0; j <= i; j++)
-	    {
-		v[br + j].v[0] = (rb[0] + (j * ri[0]));
-		v[br + j].v[2] = (rb[2] + (j * ri[2]));
-
-		float th = atan2(v[br + j].v[0], v[br + j].v[2]);
-		float factor = progress*(ratioRadiusToSideDist-1)*fabsf(cosf(size*th/2))+1;
-		
-		v[br + j].v[0] *= factor;
-		v[br + j].v[2] *= factor;
-	    }
-	}
-	
 	Vertex *lVer = wv + (l * nWVer / 2);
 	Vertex *hVer = wv + ((l + size) * nWVer / 2);
-	
+
 	/*side walls */
 	    nRowS = pow (2, subdiv);
 
@@ -432,60 +457,67 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 		for (k = 0; k < 3; k+=2)
 		{
 		    lVer[i].v[k] = b.v[k] + (i * vab[k]);
-		    hVer[i].v[k] = lVer[i].v[k];
-		    
 		}
-		float th = atan2(lVer[i].v[0], lVer[i].v[2]);
-		float factor = progress*(ratioRadiusToSideDist-1)*fabsf(cosf(size*th/2))+1;
-		    
-		for (k = 0; k < 3; k+=2)
-		    lVer[i].v[k] *= factor;
-		
-		for (k = 0; k < 3; k+=2)
-		    hVer[i].v[k] *= factor;
+
+		float th = atan2f(lVer[i].v[0], lVer[i].v[2]);
 
 
-		
-		/*lVer[i].n[0] = sinf(ang);
+		lVer[i].v[0] += progress*(sinf (ang-aStep+i*aStep/(nRowS))-lVer[i].v[0]);
+		lVer[i].v[2] += progress*(cosf (ang-aStep+i*aStep/(nRowS))-lVer[i].v[2]);
+
+		lVer[i].v[0] *= r;
+		lVer[i].v[2] *= r;
+
+		for (k = 0; k < 3; k+=2)
+		    hVer[i].v[k] = lVer[i].v[k];
+
+
+		lVer[i].n[0] = (1-progress)*sinf(ang) + progress*sinf(th);
 		lVer[i].n[1] = 0;
-		lVer[i].n[2] = cosf(ang);
-		
+		lVer[i].n[2] = (1-progress)*cosf(ang) + progress*cosf(th);
+
 		hVer[i].n[0] = lVer[i].n[0];
 		hVer[i].n[1] = lVer[i].n[1];
-		hVer[i].n[2] = lVer[i].n[2];*/
+		hVer[i].n[2] = lVer[i].n[2];
 	    }
-	
-	
-	
+
 	ang += aStep;
     }
+}
 
 static void
-deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
+deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool groundNormals)
 {
     ATLANTIS_SCREEN (s);
     CUBE_SCREEN (s);
 
-    int          nVer, nWVer, nWIdx, nWVer2, nWIdx2, nRow, nRowS, subdiv;
+    int          nWVer, nWIdx, nWVer2, nWIdx2, nRow, nRowS, subdiv;
     Vertex       *v;
     int          i, j, k, l;
-    int          br;
 
     float  ang, r, aStep;
-    
+
     Vertex       *wv;
-    
-    int bottom = -0.5, size = as->hsize;
- 
+
+    int size = as->hsize;
+
     float ratioRadiusToSideDist, sphereRadiusFactor, sphereRadiusFactor2;
-   
-    Vertex a = {{ 0.0, 0.0, 0.0 }};
+
+    //int bottom = -0.5;
+
+    //Vertex a = {{ 0.0, 0.0, 0.0 }};
     Vertex b = {{ 0.0, 0.0, 0.0 }};
     Vertex c = {{ 0.0, 0.0, 0.0 }};
-    Vertex d = {{ 0.0, bottom, 0.0 }};
-    Vertex e = {{ 0.0, bottom, 0.0 }};
-    
-    float    vab[3], vac[3], rb[3], re[3], ri[3];
+    //Vertex d = {{ 0.0, bottom, 0.0 }};
+    //Vertex e = {{ 0.0, bottom, 0.0 }};
+
+    float    vab[3];//, vac[3];
+
+    int c1 = 1; /* counter for how many points already indexed */
+    int c2 = 1; /* similar to c but for indices add one for each layer */
+
+    float dist, factor, x, y, dx, dy;
+
 
     if (!w)
 	return;
@@ -497,28 +529,25 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 	return;
 
     subdiv = w->sDiv;
-    nRow = (subdiv)?(2 << (subdiv - 1)) + 1 : 2;
-    nVer = (nRow * (nRow + 1)) / 2;
+    nRow = (subdiv)?(2 << (subdiv - 1)) : 1;
 
     nWIdx = pow (2, subdiv + 1) * 3;
     nWVer = pow (2, subdiv + 1) + 2;
 
-    nWIdx2 = nWIdx * (nRow -1)*2;
-    nWVer2 = nWVer * nRow / 2;
+    nWIdx2 = nWIdx * (nRow)*2;
+    nWVer2 = nWVer * (nRow+1) / 2;
 
     ratioRadiusToSideDist = as->radius*as->ratio/as->sideDistance;
 
     sphereRadiusFactor  = as->radius/100000;
     sphereRadiusFactor  = progress*(hypotf(sphereRadiusFactor, 0.5f)/sphereRadiusFactor-1);
-    //sphereRadiusFactor2 = sphereRadiusFactor*cosf(waterBottom*PI)+1;
-    //sphereRadiusFactor  = sphereRadiusFactor*cosf(w->bh*PI)+1;
     sphereRadiusFactor2 = sphereRadiusFactor*cosf(w->bh*PI)+1;
-    
+
     r = cs->distance / cosf (M_PI / size);
     ang = M_PI / size;
     aStep = 2 * M_PI / size;
-    
-    wv = w->vertices + (size * nVer);
+
+    wv = w->vertices + w->nSVer;
 
     if (nWVer2 * size != w->nWVer2 && w->vertices2)
     {
@@ -533,138 +562,154 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 
     w->nWVer2 = nWVer2 * size;
     w->nWIdx2 = nWIdx2 * size;
-    
+
     if (!w->vertices2)
     {
-	w->vertices2 = calloc (1,sizeof (Vertex) * w->nWVer2);
+	w->vertices2 = calloc (1, sizeof (Vertex) * w->nWVer2);
 	if (!w->vertices2)
 	    return;
     }
 
     if (!w->indices2)
     {
-	w->indices2 = calloc (1,sizeof (int) * w->nWIdx2);
+	w->indices2 = calloc (1, sizeof (int) * (w->nWIdx2 + (nWIdx * size / 2)));
     	if (!w->indices2)
     	    return;
     }
-    
+
+    v =   w->vertices;
+
+    //v[0] = a;
+
+
+    /* new coordinates, spiralling around from centre */
+    for (i = 1; i<= nRow; i++)
+    {
+	ang = PI/size;
+	dist = i * r/nRow;
+	factor = dist * sphereRadiusFactor2;
+
+	for (j=0; j<size; j++)
+	{
+	    x = cosf (ang);
+	    y = sinf (ang);
+
+	    ang -= aStep;
+	    dx = (cosf (ang) - x) / i;
+
+	    dy = (sinf (ang) - y) / i;
+
+	    c2 = i*j+c1;
+	    for (k=0; k< i; k++, c2++)
+	    {
+		v[c2].v[0] = y + k*dy;
+		v[c2].v[2] = x + k*dx;
+
+		v[c2].v[0] += progress*(sinf (ang+aStep-(k*aStep)/(i))-v[c2].v[0]);
+		v[c2].v[2] += progress*(cosf (ang+aStep-(k*aStep)/(i))-v[c2].v[2]);
+
+		v[c2].v[0] *= factor;
+		v[c2].v[2] *= factor;
+
+		/* translation not needed*/
+		/*
+		v[c2].v[0] += a[0];
+		v[c2].v[2] += a[2];
+		*/
+	    }
+	}
+
+	c1 += i * size;
+    }
+
+
+    ang = M_PI / size;
 
     for (l = 0; l < size; l++)
     {
-	v =   w->vertices + (l * nVer);
+	b.v[0] = sinf (ang - aStep);
+	b.v[2] = cosf (ang - aStep);
 
-	d.v[0] = b.v[0] = sin (ang - aStep) * r;
-	d.v[2] = b.v[2] = cos (ang - aStep) * r;
+	c.v[0] = sinf (ang);
+	c.v[2] = cosf (ang);
 
-	e.v[0] = c.v[0] = sin (ang) * r;
-	e.v[2] = c.v[2] = cos (ang) * r;
+	Vertex *lVer = w->vertices2 + (l * nWVer2 / (nRow+1));
+
+	/*side walls */
+	nRowS = pow (2, subdiv);
 
 	for (i = 0; i < 3; i++)
 	{
-	    vab[i] = b.v[i] - a.v[i];
-	    vab[i] /= nRow - 1.0;
-	    vac[i] = c.v[i] - a.v[i];
-	    vac[i] /= nRow - 1.0;
+	    vab[i] = c.v[i] - b.v[i];
+	    vab[i] /= nRowS;
 	}
 
-	//v[0] = a;
-
-
-	for (i = 1; i < nRow; i++)
+	for (i = 0; i <= nRowS; i++)
 	{
-	    br = (i * (i + 1)) / 2;
 	    for (k = 0; k < 3; k++)
-	    {
-		rb[k] = a.v[k] + (i * vab[k]);
-		re[k] = a.v[k] + (i * vac[k]);
-		ri[k] = re[k] - rb[k];
-		ri[k] /= i;
-	    }
-	    
-	    for (j = 0; j <= i; j++)
-	    {
-		v[br + j].v[0] = (rb[0] + (j * ri[0]));
-		v[br + j].v[2] = (rb[2] + (j * ri[2]));
+		lVer[i].v[k] = b.v[k] + (i * vab[k]);
 
-		float th = atan2(v[br + j].v[0], v[br + j].v[2]);
+	    lVer[i].v[0] += progress*(sinf (ang-aStep+i*aStep/(nRowS))-lVer[i].v[0]);
+	    lVer[i].v[2] += progress*(cosf (ang-aStep+i*aStep/(nRowS))-lVer[i].v[2]);
 
-		float factor = progress*(ratioRadiusToSideDist-1)*
-			       (fabsf(cosf(size*th/2)))+1;
-		factor *= sphereRadiusFactor2;
-		
-		v[br + j].v[0] *= factor;
-		v[br + j].v[2] *= factor;
+	    float th = atan2(lVer[i].v[0], lVer[i].v[2]);
+
+	    lVer[i].n[0] = (1-progress)*sinf (ang - aStep/2) + progress*sinf(th);
+	    lVer[i].n[1] = 0;
+	    lVer[i].n[2] = (1-progress)*cosf (ang - aStep/2) + progress*cosf(th);
+
+	    for (j=nRow; j>=0; j--)
+	    {
+		Vertex *hVer = lVer + j * (size * nWVer2 / (nRow+1));
+
+		for (k = 0; k < 3; k++)
+		{
+		    hVer[i].v[k] = lVer[i].v[k];
+		    hVer[i].n[k] = lVer[i].n[k];
+		}
+
+		float p = ((float) j)/nRow;
+
+		hVer[i].n[0] = p*((1-progress)*sinf (ang - aStep/2) + progress*sinf(th));
+		hVer[i].n[1] = (1-p);
+		hVer[i].n[2] = p*((1-progress)*cosf (ang - aStep/2) + progress*cosf(th));
+
+		float hFactor = r * (sphereRadiusFactor *
+			cosf((w->bh-j*(w->bh-waterBottom)/(nRow))*PI)+1);
+
+		for (k = 0; k < 3; k+=2)
+		    hVer[i].v[k] *= hFactor;
 	    }
 	}
-	
-	//Vertex *lVer = w->vertices2 + (l * nWVer / 2);
-	//Vertex *hVer = w->vertices2 + ((l + size) * nWVer / 2);
 
-	Vertex *lVer = w->vertices2 + (l * nWVer2 / nRow);
+	unsigned int * indices = w->indices2 + (l * nWIdx);
+	unsigned int idxBaseL = (l * nWVer / 2);
 
-	
-	/*side walls */
-	    nRowS = pow (2, subdiv);
+	for (j=0; j<nRow; j++)
+	{
+	    unsigned int idxBaseH = idxBaseL + size * nWVer / 2;
 
-	    for (i = 0; i < 3; i++)
+	    for (i = 0; i < nRowS; i++)
 	    {
-		vab[i] = c.v[i] - b.v[i];
-		vab[i] /= nRowS;
+		indices[(i * 6)] = idxBaseL + i;
+		indices[(i * 6) + 1] = idxBaseH + i;
+		indices[(i * 6) + 2] = idxBaseH + i + 1;
+		indices[(i * 6) + 3] = idxBaseL + i + 1;
+		indices[(i * 6) + 4] = idxBaseL + i;
+		indices[(i * 6) + 5] = idxBaseH + i + 1;
 	    }
+	    idxBaseL = idxBaseH;
+	    indices += 2*nWIdx2 / (nRow);
+	}
 
-	    for (i = 0; i <= nRowS; i++)
-	    {
-		for (k = 0; k < 3; k++)
 
-		    lVer[i].v[k] = b.v[k] + (i * vab[k]);
+	/* bottom face indices */
+	idxBaseL = (nRow-1) * size * nWVer / 2;
+	indices = w->indices2 + w->nWIdx2 + (l * nRow);
 
-		float th = atan2(lVer[i].v[0], lVer[i].v[2]);
-		float lFactor = progress*(ratioRadiusToSideDist-1)*
-			        (fabsf(cosf(size*th/2)))+1;		
-		//lFactor *= sphereRadiusFactor * cosf(w->bh*PI)+1;
+	for (j=0; j<nRow; j++)
+	    indices[j] = idxBaseL + ((size-1-l + size) * nWVer / 2) + nRow-1-j;
 
-		lVer[i].n[0] = (1-progress)*sinf(ang) + progress*sinf(th);
-		lVer[i].n[1] = 0;
-		lVer[i].n[2] = (1-progress)*cosf(ang) + progress*cosf(th);
-
-		for (j=nRow-1; j>=0; j--)
-                {
-		    Vertex *hVer = lVer + j * (size * nWVer2 / nRow);
-		    
-		    for (k = 0; k < 3; k++)
-		    {
-			hVer[i].v[k] = lVer[i].v[k];
-			hVer[i].n[k] = lVer[i].n[k];
-		    }
-    
-		    float hFactor = lFactor * (sphereRadiusFactor * cosf((w->bh-j*(w->bh-waterBottom)/(nRow-1))*PI)+1);
-		    
-		    for (k = 0; k < 3; k+=2)
-			hVer[i].v[k] *= hFactor;
-		}
-
-	    }
-	    
-	    unsigned int * indices = w->indices2 + (l * nWIdx);
-	    unsigned int idxBaseL = (l * nWVer / 2);
-	    
-	    for (j=0; j<nRow-1; j++)
-	    {
-		unsigned int idxBaseH = idxBaseL + size * nWVer / 2;
-		
-		for (i = 0; i < nRowS; i++)
-		{
-		    indices[(i * 6)] = idxBaseL + i;
-		    indices[(i * 6) + 1] = idxBaseH + i;
-		    indices[(i * 6) + 2] = idxBaseH + i + 1;
-		    indices[(i * 6) + 3] = idxBaseL + i + 1;
-		    indices[(i * 6) + 4] = idxBaseL + i;
-		    indices[(i * 6) + 5] = idxBaseH + i + 1;
-		}
-		idxBaseL = idxBaseH;
-		indices += 2*nWIdx2 / (nRow-1);
-	    }
-	    
 
 	ang += aStep;
     }
@@ -717,12 +762,8 @@ updateHeight (Water  *w, Water *w2, Bool rippleEffect, int currentDeformation)
 	    
 	vertices += w->nWVer / 2;
 	
-	//FIX get rid of the sphere check
-	if (w2 && currentDeformation!=DeformationSphere) /* this is okay because ground and water have same grid size */
-	    for (i = w2->nSVer; i < w2->nSVer + (w2->nWVer / 2); i++)
-	        setAmplitude(&vertices[i], w2->bh, w2->wave1, w2->wave2, w2->wa,
-			     w2->swa, w2->wf, w2->swf, 0, 0);
-	else
+	 /* set bottom ground to base of deformed cube */
+	 /* this is okay because ground and water have same grid size */
 	    for (i = w->nSVer; i < w->nSVer + (w->nWVer / 2); i++)
 	        vertices[i].v[1] = -0.5;
     }
@@ -788,9 +829,7 @@ updateDeformation (CompScreen *s, int currentDeformation)
 		break;
 		
 	    case DeformationSphere :
-		deformSphere(s, as->water, progress,
-		             //snowglobeGetShowGround (s) ? as->ground->bh :
-		              -0.5);
+		deformSphere(s, as->water, progress, -0.5, FALSE);
 	    }    
 	}
 
@@ -805,7 +844,7 @@ updateDeformation (CompScreen *s, int currentDeformation)
 		break;
 		
 	    case DeformationSphere :
-		deformSphere (s, as->ground, progress, -0.5);
+		deformSphere (s, as->ground, progress, -0.5, TRUE);
 	    }
 
 	    updateHeight (as->ground, NULL, FALSE, currentDeformation);
@@ -1077,26 +1116,84 @@ drawGround (Water *w, Water *g, int currentDeformation)
 
 }
 
-void
-drawBottomGround (int size, float distance, float bottom)
+static void fillBottom (Water *w, float distance, float bottom, int currentDeformation)
 {
-	glEnable (GL_COLOR_MATERIAL);
-
     int   i;
-    float r = distance / cos (M_PI / size);
-    float ang = M_PI / size;
-    float aStep = 2 * M_PI / size;
+    int   nRow;
+    float *v;
+    int	  size = w->size;
 
-    for (i = 0; i < size; i++)
+    if (currentDeformation==DeformationCylinder)
     {
-	glBegin (GL_TRIANGLES);
+	nRow = pow (2, w->sDiv);
 
-	glVertex3f (sin (ang - aStep) * r, bottom, cos (ang - aStep) * r);
-	glVertex3f (0.0, bottom, 0.0);
-	glVertex3f (sin (ang) * r, bottom, cos (ang) * r);
-	glEnd ();
-	ang += aStep;
+	v = (float *) w->vertices;
+
+	glNormal3f (0, -1, 0);
+
+	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+	glDisableClientState (GL_NORMAL_ARRAY);
+
+	glDrawElements (GL_TRIANGLE_FAN, size * nRow, GL_UNSIGNED_INT, w->indices + w->nSIdx + w->nWIdx);
     }
+    else if (currentDeformation==DeformationSphere)
+    {
+	nRow = pow (2, w->sDiv);
+
+	v = (float *) w->vertices2;
+
+	glNormal3f (0, -1, 0);
+
+	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+	glDisableClientState (GL_NORMAL_ARRAY);
+
+	glDrawElements (GL_TRIANGLE_FAN, size * nRow, GL_UNSIGNED_INT, w->indices2 + w->nWIdx2);
+    }
+    else
+    {
+	float r = distance / cos (M_PI / size);
+	float ang = M_PI / size;
+	float aStep = 2 * M_PI / size;
+
+	glBegin (GL_TRIANGLE_FAN);
+	glNormal3f (0, -1, 0);
+	glVertex3f (0.0, bottom, 0.0);
+
+	for (i = 0; i <= size; i++)
+	{
+	    glVertex3f (sin (ang) * r, bottom, cos (ang) * r);
+
+	    ang -= aStep;
+	}
+	glEnd ();
+    }
+
+
+}
+
+void
+drawBottomGround (Water *w, float distance, float bottom, int currentDeformation)
+{
+    glDisable (GL_DEPTH_TEST);
+
+    glEnable (GL_LIGHTING);
+    glEnable (GL_LIGHT1);
+    glDisable (GL_LIGHT0);
+
+    fillBottom (w, distance, bottom, currentDeformation);
+
+    glDisable (GL_LIGHTING);
+}
+
+void
+drawBottomWater (Water *w, float distance, float bottom, int currentDeformation)
+{
+    glDisable (GL_DEPTH_TEST);
+
+    glDisable (GL_LIGHTING);
+
+    glEnable (GL_COLOR_MATERIAL);
+    fillBottom (w, distance, bottom, currentDeformation);
 }
 
 float
