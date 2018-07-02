@@ -24,6 +24,12 @@
 
 /* Uses water amplitude calculation by David Mikos */
 
+/*
+ * At the moment dealing with deformation has introduced lots of
+ * redundant/repeated sections code and generally messy code.
+ * This needs some tidying up.
+ */ 
+
 #include "snowglobe-internal.h"
 #include "math.h"
 #include "snowglobe_options.h"
@@ -225,6 +231,9 @@ genWater (int size, int sDiv, float distance, float bottom)
 	return NULL;
     }
 
+    w->vertices2 = NULL;
+    w->indices2  = NULL;
+
     r = distance / cos (M_PI / size);
     ang = M_PI / size;
     aStep = 2 * M_PI / size;
@@ -263,6 +272,10 @@ freeWater (Water *w)
 	free (w->vertices);
     if (w->indices)
 	free (w->indices);
+    if (w->vertices2)
+	free (w->vertices2);
+    if (w->indices2)
+	free (w->indices2);
 }
 
 static void
@@ -455,7 +468,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
     ATLANTIS_SCREEN (s);
     CUBE_SCREEN (s);
 
-    int          nVer, nWVer, nRow, nRowS, subdiv;
+    int          nVer, nWVer, nWIdx, nRow, nRowS, subdiv;
     Vertex       *v;
     int          i, j, k, l;
     int          br;
@@ -489,20 +502,40 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
     nRow = (subdiv)?(2 << (subdiv - 1)) + 1 : 2;
     nVer = (nRow * (nRow + 1)) / 2;
 
+    nWIdx = pow (2, subdiv + 1) * 3;
     nWVer = pow (2, subdiv + 1) + 2;
 
     ratioRadiusToSideDist = as->radius*as->ratio/as->sideDistance;
 	
     sphereRadiusFactor  = as->radius/100000;
     sphereRadiusFactor  = hypotf(sphereRadiusFactor, 0.5f)/sphereRadiusFactor;
-    sphereRadiusFactor2 = (sphereRadiusFactor-1)*cosf(waterBottom*PI)+1;
-    sphereRadiusFactor  = (sphereRadiusFactor-1)*cosf(w->bh*PI)+1;
+    sphereRadiusFactor2 = progress*(sphereRadiusFactor-1)*cosf(waterBottom*PI)+1;
+    sphereRadiusFactor  = progress*(sphereRadiusFactor-1)*cosf(w->bh*PI)+1;
     
     r = cs->distance / cosf (M_PI / size);
     ang = M_PI / size;
     aStep = 2 * M_PI / size;
     
     wv = w->vertices + (size * nVer);
+
+
+    w->nWVer2 = nWVer * size;
+    w->nWIdx2 = nWIdx * size;
+    
+    if (!w->vertices2)
+    {
+	w->vertices2 = calloc (1,sizeof (Vertex) * w->nWVer2);
+	if (!w->vertices2)
+	    return;
+    }
+
+    if (!w->indices2)
+    {
+	w->indices2 = calloc (1,sizeof (int) * w->nWIdx2);
+    	if (!w->indices2)
+    	    return;
+    }
+    
 
     for (l = 0; l < size; l++)
     {
@@ -552,8 +585,8 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 	    }
 	}
 	
-	Vertex *lVer = wv + (l * nWVer / 2);
-	Vertex *hVer = wv + ((l + size) * nWVer / 2);
+	Vertex *lVer = w->vertices2 + (l * nWVer / 2);
+	Vertex *hVer = w->vertices2 + ((l + size) * nWVer / 2);
 	
 	/*side walls */
 	    nRowS = pow (2, subdiv);
@@ -568,7 +601,7 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 
 	    for (i = 0; i <= nRowS; i++)
 	    {
-		for (k = 0; k < 3; k+=2)
+		for (k = 0; k < 3; k++)
 		{
 		    lVer[i].v[k] = b.v[k] + (i * vab[k]);
 		    hVer[i].v[k] = d.v[k] + (i * vcd[k]);
@@ -594,16 +627,34 @@ deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom)
 		hVer[i].n[1] = lVer[i].n[1];
 		hVer[i].n[2] = lVer[i].n[2];
 	    }
-	
+	    
+	    unsigned int * indices = w->indices2 + (l * nWIdx);
+	    unsigned int idxBaseL = (l * nWVer / 2);
+	    unsigned int idxBaseH = ((l + size) * nWVer / 2);
+	    
+	    for (i = 0; i < nRowS; i++)
+	    {
+		indices[(i * 6)] = idxBaseL + i;
+		indices[(i * 6) + 1] = idxBaseH + i;
+		indices[(i * 6) + 2] = idxBaseH + i + 1;
+		indices[(i * 6) + 3] = idxBaseL + i + 1;
+		indices[(i * 6) + 4] = idxBaseL + i;
+		indices[(i * 6) + 5] = idxBaseH + i + 1;
+	    }
+	    
+
 	ang += aStep;
     }
 }
 
 void
-updateHeight (Water  *w, Bool rippleEffect)
+updateHeight (Water  *w, Water *w2, Bool rippleEffect, int currentDeformation)
 {
     int offset;
 
+    Bool useOtherWallVertices;
+    Vertex * vertices;
+    
     int i;
     
     if (!w)
@@ -611,16 +662,34 @@ updateHeight (Water  *w, Bool rippleEffect)
 
     offset = w->nSVer/2 + 1;
     rippleEffect = (rippleEffect && w->rippleFactor);
+
+    useOtherWallVertices = (currentDeformation == DeformationSphere &&
+	    		    w->vertices2);
+    vertices = (useOtherWallVertices ? w->vertices2 - w->nSVer : w->vertices);
     
     for (i = 0; i < w->nSVer; i++)
 	setAmplitude(&w->vertices[i], w->bh, w->wave1, w->wave2, w->wa,
 	             w->swa, w->wf, w->swf,
 	             (rippleEffect ? w->rippleFactor[i] : 0),
-	             (rippleEffect ? w->rippleFactor[(i+offset)%w->nSVer] : 0) );
+	             (rippleEffect ? w->rippleFactor[(i+offset)%w->nSVer] :
+	             		     0) );
     
     for (i = w->nSVer; i < w->nSVer + (w->nWVer / 2); i++)
-        setAmplitude(&w->vertices[i], w->bh, w->wave1, w->wave2, w->wa,
+        setAmplitude(&vertices[i], w->bh, w->wave1, w->wave2, w->wa,
 		     w->swa, w->wf, w->swf, 0, 0);
+
+    if (useOtherWallVertices)
+    {
+	vertices += (w->nWVer / 2);
+	
+	if (w2) /* this is okay because ground and water have same grid size */
+	    for (i = w2->nSVer; i < w2->nSVer + (w2->nWVer / 2); i++)
+	        setAmplitude(&vertices[i], w2->bh, w2->wave1, w2->wave2, w2->wa,
+			     w2->swa, w2->wf, w2->swf, 0, 0);
+	else
+	    for (i = w->nSVer; i < w->nSVer + (w->nWVer / 2); i++)
+	        vertices[i].v[1] = -0.5;
+    }
 }
 
 void
@@ -691,7 +760,7 @@ updateDeformation (CompScreen *s, int currentDeformation)
 	    }
 
 
-	    updateHeight (as->ground, FALSE);
+	    updateHeight (as->ground, NULL, FALSE, currentDeformation);
 	}
     }
 }
@@ -799,11 +868,12 @@ updateGround (CompScreen *s, float time)
     as->ground->wf  = 2.0;
     as->ground->swf = 10.0;
 
-    updateHeight (as->ground, FALSE);
+    updateHeight (as->ground, NULL, FALSE, DeformationNone);
+
 }
 
 void
-drawWater (Water *w, Bool full, Bool wire)
+drawWater (Water *w, Bool full, Bool wire, int currentDeformation)
 {
     static const float mat_shininess[]      = { 50.0 };
     static const float mat_specular[]       = { 0.5, 0.5, 0.5, 1.0 };
@@ -845,7 +915,19 @@ drawWater (Water *w, Bool full, Bool wire)
 	glDisableClientState (GL_NORMAL_ARRAY);
 	glDisable (GL_LIGHTING);
 
-	glDrawElements (GL_TRIANGLES, w->nWIdx, GL_UNSIGNED_INT, w->indices + w->nSIdx);
+	if (currentDeformation == DeformationSphere && w->vertices2 && w->indices2)
+	{
+	    v = (float *) w->vertices2;
+		
+	    glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+	    glNormalPointer (GL_FLOAT, 6 * sizeof (float), v + 3);
+
+	    glDrawElements (GL_TRIANGLES, w->nWIdx2, GL_UNSIGNED_INT, w->indices2);
+	}
+	else
+	    glDrawElements (GL_TRIANGLES, w->nWIdx, GL_UNSIGNED_INT, w->indices + w->nSIdx);
+	
+
 
 	glEnableClientState (GL_TEXTURE_COORD_ARRAY);
     }
@@ -875,7 +957,7 @@ drawWater (Water *w, Bool full, Bool wire)
 }
 
 void
-drawGround (Water *w, Water *g)
+drawGround (Water *w, Water *g, int currentDeformation)
 {
     static const float mat_shininess[]      = { 40.0 };
     static const float mat_specular[]       = { 0.0, 0.0, 0.0, 1.0 };
@@ -925,7 +1007,22 @@ drawGround (Water *w, Water *g)
     glDisableClientState (GL_NORMAL_ARRAY);
     glDisable (GL_LIGHTING);
 
-    glDrawElements (GL_TRIANGLES, g->nWIdx, GL_UNSIGNED_INT, g->indices + g->nSIdx);
+    if (currentDeformation == DeformationSphere && g->vertices2 && g->indices2)
+    {
+	v = (float *) g->vertices2;
+
+	if (w)
+	    n = (float *) w->vertices + 6 * g->nSIdx;
+	else
+	    n = (float *) g->vertices2;
+	
+	glNormalPointer (GL_FLOAT, 6 * sizeof (float), n + 3);
+	glVertexPointer (3, GL_FLOAT, 6 * sizeof (float), v);
+
+	glDrawElements (GL_TRIANGLES, g->nWIdx2, GL_UNSIGNED_INT, g->indices2);
+    }
+    else
+	glDrawElements (GL_TRIANGLES, g->nWIdx, GL_UNSIGNED_INT, g->indices + g->nSIdx);
 
     glEnableClientState (GL_TEXTURE_COORD_ARRAY);
 
