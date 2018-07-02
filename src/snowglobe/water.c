@@ -978,13 +978,14 @@ drawWater (Water *w, Bool full, Bool wire, int currentDeformation)
 
 
 	glEnableClientState (GL_TEXTURE_COORD_ARRAY);
+
+    glColor4usv (defaultColor);
+
     }
 
     if (wire)
     {
 	int i, j;
-
-	glColor4usv (defaultColor);
 
 	glDisable (GL_LIGHTING);
 
