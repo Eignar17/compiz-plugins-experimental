@@ -155,7 +155,10 @@ void
 drawGround(Water *w, Water *g, int currentDeformation);
 
 void
-drawBottomGround (int size, float distance, float bottom);
+drawBottomGround(Water *w, float distance, float bottom, int currentDeformation);
+
+void
+drawBottomWater(Water *w, float distance, float bottom, int currentDeformation);
 
  /* utility methods */
 int
