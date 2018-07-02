@@ -325,7 +325,7 @@ setAmplitude (Vertex *v,
 static void
 deformCylinder(CompScreen *s, Water  *w, float progress)
 {
-    ATLANTIS_SCREEN (s);
+    SNOWGLOBE_SCREEN (s);
     CUBE_SCREEN (s);
 
     int          nVer, nWVer, nRow, nRowS, subdiv;
@@ -488,7 +488,7 @@ deformCylinder(CompScreen *s, Water  *w, float progress)
 static void
 deformSphere(CompScreen *s, Water  *w, float progress, float waterBottom, Bool groundNormals)
 {
-    ATLANTIS_SCREEN (s);
+    SNOWGLOBE_SCREEN (s);
     CUBE_SCREEN (s);
 
     int          nWVer, nWIdx, nWVer2, nWIdx2, nRow, nRowS, subdiv;
