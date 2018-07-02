@@ -224,7 +224,8 @@ snowglobePaintInside (CompScreen *s,
 	updateHeight(as->water);
     {
 	updateDeformation (s, currentDeformation);
- 	updateHeight (as->water, atlantisGetWaveRipple(s));
+	updateHeight (as->water, atlantisGetShowGround (s) ? as->ground : NULL,
+	              atlantisGetWaveRipple(s), currentDeformation);
      }	
     sA.yRotate += cs->invert * (360.0f / size) *
 		 (cs->xRotations - (s->x* cs->nOutput));
@@ -267,7 +268,9 @@ snowglobePaintInside (CompScreen *s,
     if (snowglobeGetShowGround (s) && !snowglobeIsCylinder(s))
     {
 	glColor4f(0.8, 0.8, 0.8, 1.0);
-	drawGround(NULL, as->ground);
+	    drawGround (as->water, as->ground, currentDeformation);
+ 	else
+	    drawGround (NULL, as->ground, currentDeformation);
 
     }
 
@@ -329,7 +332,7 @@ snowglobePaintInside (CompScreen *s,
     {
 	glEnable(GL_CULL_FACE);
 	glColor4usv(snowglobeGetWaterColor(s));
-	drawWater(as->water, snowglobeGetShowWater(s), 0);
+	drawWater (as->water, TRUE, FALSE, currentDeformation);
     }
 
     if (currentDeformation!=DeformationCylinder && currentDeformation!=DeformationSphere)
