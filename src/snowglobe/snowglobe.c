@@ -127,6 +127,47 @@ initSnowglobe (CompScreen *s)
     DrawSnowflake(0);
     glEndList();
 }
+static float calculateScreenRatio (CompScreen *s)
+{
+    CUBE_SCREEN (s);
+
+    float temp, ratio;
+    int i;
+
+    if (!SnowglobeGetRescaleWidth (s))
+	return 1.0f;
+
+    ratio = (float) s->width / (float) s->height;
+
+    if (s->nOutputDev <= 1)
+	return ratio;
+
+    temp = 0;
+
+    if (cs->moMode == CUBE_MOMODE_AUTO && cs->nOutput < s->nOutputDev)
+    {
+	return ratio;
+    }
+    else if (cs->moMode == CUBE_MOMODE_ONE)
+    {
+	/* this doesn't seem right, but it works */
+	for (i = 0; i < s->nOutputDev; i++)
+	    temp += (float) s->width / (float) s->outputDev->height;;
+
+	if (temp != 0)
+	    ratio = temp / s->nOutputDev;
+    }
+    else
+    {
+	for (i = 0; i < s->nOutputDev; i++)
+	    temp += (float) s->outputDev->width / (float) s->outputDev->height;
+
+	if (temp != 0)
+	    ratio = temp / s->nOutputDev;
+    }
+
+    return ratio;
+}
 
 void
 initializeWorldVariables(CompScreen *s)
@@ -141,6 +182,9 @@ initializeWorldVariables(CompScreen *s)
     as->arcAngle = 360.0f / as->hsize;
     as->radius = cs->distance/sinf(0.5*(PI-as->arcAngle*toRadians));
     as->distance = cs->distance;
+
+    as->ratio = calculateScreenRatio (s);
+
 }
 
 static void
@@ -228,6 +272,8 @@ snowglobePaintInside (CompScreen *s,
     else
 	as->waterHeight = 50000;
 
+    ratio = calculateScreenRatio (s);
+
     if (new_hsize < as->hsize || fabsf (ratio - as->ratio) > 0.0001)
 	updatesnowglobe (s);
     else if (new_hsize > as->hsize)
@@ -310,6 +356,8 @@ snowglobePaintInside (CompScreen *s,
     glEnable(GL_COLOR_MATERIAL);
 
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+    glScalef (0.00001f / as->ratio, 0.00001f, 0.00001f / as->ratio);
 
     for (i = 0; i < as->numSnowflakes; i++)
     {
