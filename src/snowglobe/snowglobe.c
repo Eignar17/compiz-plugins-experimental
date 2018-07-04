@@ -114,7 +114,10 @@ initSnowglobe (CompScreen *s)
 
     }
 
+    if (SnowglobeGetShowWater (s))
     as->waterHeight = SnowglobeGetWaterHeight(s)*100000-50000;
+    else
+	as->waterHeight = 50000;
 
     as->oldProgress = 0;
 
@@ -202,14 +205,8 @@ snowglobePaintInside (CompScreen *s,
     CUBE_SCREEN (s);
 
     int i;
-	
-    int drawDeformation = (as->oldProgress==0.0f ? getCurrentDeformation(s) :
-						   getDeformationMode (s) );
-	
-    as->waterHeight = snowglobeGetWaterHeight(s)*100000-50000;
 
-    if (as->hsize!=s->hsize) updateSnowglobe (s);
-
+    float scale, ratio;
 
     static const float mat_shininess[] = { 60.0 };
     static const float mat_specular[] = { 0.8, 0.8, 0.8, 1.0 };
@@ -221,13 +218,29 @@ snowglobePaintInside (CompScreen *s,
     ScreenPaintAttrib sA = *sAttrib;
     CompTransform mT = *transform;
 
-    if (snowglobeGetShowWater(s))
-	updateHeight(as->water);
+    int new_hsize = s->hsize * cs->nOutput;	
+
+    int drawDeformation = (as->oldProgress==0.0f ? getCurrentDeformation(s) :
+						   getDeformationMode (s) );
+
+    if (snowglobeGetShowWater(s))	
+    as->waterHeight = snowglobeGetWaterHeight(s)*100000-50000;
+    else
+	as->waterHeight = 50000;
+
+    if (new_hsize < as->hsize || fabsf (ratio - as->ratio) > 0.0001)
+	updatesnowglobe (s);
+    else if (new_hsize > as->hsize)
+
+    { /* let snow in their expanded enclosure without fully resetting */
+	initWorldVariables (s);
+    }
+    if (snowglobeGetShowWater(s) || atlantisGetShowGround (s))
     {
 	updateDeformation (s, drawDeformation);
-	updateHeight (as->water, snowglobeGetShowGround (s) ? as->ground : NULL,
-	              snowglobeGetWaveRipple(s), drawDeformation);
+	updateHeight (as->water, snowglobeGetShowGround (s) ? as->ground : NULL, drawDeformation);
      }	
+
     sA.yRotate += cs->invert * (360.0f / size) *
 		 (cs->xRotations - (s->x* cs->nOutput));
 
@@ -258,6 +271,9 @@ snowglobePaintInside (CompScreen *s,
     glEnable(GL_CULL_FACE);
 
     glCullFace(~cull & (GL_FRONT | GL_BACK));
+    drawWater (as->water, TRUE, FALSE, drawDeformation);
+    glCullFace (cull);
+    }
 
     if (snowglobeGetShowWater(s))
     {
